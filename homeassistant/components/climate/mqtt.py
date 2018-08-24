@@ -15,7 +15,7 @@ from homeassistant.components import mqtt
 from homeassistant.components.climate import (
     STATE_HEAT, STATE_COOL, STATE_DRY, STATE_FAN_ONLY, ClimateDevice,
     PLATFORM_SCHEMA as CLIMATE_PLATFORM_SCHEMA, STATE_AUTO,
-    ATTR_OPERATION_MODE, SUPPORT_TARGET_TEMPERATURE, SUPPORT_OPERATION_MODE,
+    ATTR_OPERATION_MODE, ATTR_TARGET_TEMP_STEP, SUPPORT_TARGET_TEMPERATURE, SUPPORT_OPERATION_MODE,
     SUPPORT_SWING_MODE, SUPPORT_FAN_MODE, SUPPORT_AWAY_MODE, SUPPORT_HOLD_MODE,
     SUPPORT_AUX_HEAT, DEFAULT_MIN_TEMP, DEFAULT_MAX_TEMP)
 from homeassistant.const import (
@@ -32,6 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 DEPENDENCIES = ['mqtt']
 
 DEFAULT_NAME = 'MQTT HVAC'
+DEFAULT_TARGET_TEMP_STEP = 1
 
 CONF_POWER_COMMAND_TOPIC = 'power_command_topic'
 CONF_POWER_STATE_TOPIC = 'power_state_topic'
@@ -72,6 +73,7 @@ CONF_SEND_IF_OFF = 'send_if_off'
 
 CONF_MIN_TEMP = 'min_temp'
 CONF_MAX_TEMP = 'max_temp'
+CONF_TEMPERATURE_STEP = ATTR_TARGET_TEMP_STEP
 
 SCHEMA_BASE = CLIMATE_PLATFORM_SCHEMA.extend(MQTT_BASE_PLATFORM_SCHEMA.schema)
 PLATFORM_SCHEMA = SCHEMA_BASE.extend({
@@ -122,6 +124,7 @@ PLATFORM_SCHEMA = SCHEMA_BASE.extend({
 
     vol.Optional(CONF_MIN_TEMP, default=DEFAULT_MIN_TEMP): vol.Coerce(float),
     vol.Optional(CONF_MAX_TEMP, default=DEFAULT_MAX_TEMP): vol.Coerce(float)
+    vol.Optional(CONF_TEMPERATURE_STEP, default=DEFAULT_TARGET_TEMP_STEP): vol.Coerce(float)
 
 }).extend(mqtt.MQTT_AVAILABILITY_SCHEMA.schema)
 
@@ -184,6 +187,7 @@ def async_setup_platform(hass, config, async_add_entities,
             config.get(CONF_MODE_LIST),
             config.get(CONF_FAN_MODE_LIST),
             config.get(CONF_SWING_MODE_LIST),
+            config.get(CONF_TEMPERATURE_STEP),
             config.get(CONF_INITIAL),
             False, None, SPEED_LOW,
             STATE_OFF, STATE_OFF, False,
@@ -203,11 +207,11 @@ class MqttClimate(MqttAvailability, ClimateDevice):
 
     def __init__(self, hass, name, topic, value_templates, qos, retain,
                  mode_list, fan_mode_list, swing_mode_list,
-                 target_temperature, away, hold, current_fan_mode,
-                 current_swing_mode, current_operation, aux, send_if_off,
-                 payload_on, payload_off, availability_topic,
-                 payload_available, payload_not_available,
-                 min_temp, max_temp):
+                 target_temperature_step target_temperature, away, hold, 
+                 current_fan_mode, current_swing_mode, current_operation, 
+                 aux, send_if_off, payload_on, payload_off, 
+                 availability_topic, payload_available, 
+                 payload_not_available, min_temp, max_temp):
         """Initialize the climate device."""
         super().__init__(availability_topic, qos, payload_available,
                          payload_not_available)
@@ -229,7 +233,7 @@ class MqttClimate(MqttAvailability, ClimateDevice):
         self._fan_list = fan_mode_list
         self._operation_list = mode_list
         self._swing_list = swing_mode_list
-        self._target_temperature_step = 1
+        self._target_temperature_step = target_temperature_step
         self._send_if_off = send_if_off
         self._payload_on = payload_on
         self._payload_off = payload_off
